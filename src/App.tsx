@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { GitCompareArrows, MessageSquare } from 'lucide-react'
 import { ModelSelector } from './components/ModelSelector'
-import { PromptInput } from './components/PromptInput'
+import { PromptInput, PROMPT_EXAMPLES } from './components/PromptInput'
 import { ChatWindow } from './components/ChatWindow'
 import { CompareView } from './components/CompareView'
 import { VoucherGate } from './components/VoucherGate'
 import {
+  autoChat,
   chat,
   clearStoredVoucher,
   compare,
@@ -13,18 +14,23 @@ import {
   isExpectedVoucher,
   storeVoucher,
 } from './services/api'
-import type { ChatResult, CompareItem, ProviderId } from './types'
+import type {
+  AutoChatResult,
+  ChatResult,
+  ChatProviderSelection,
+  CompareItem,
+} from './types'
 
 type Mode = 'chat' | 'compare'
 
 export default function App() {
   const [mode, setMode] = useState<Mode>('chat')
-  const [provider, setProvider] = useState<ProviderId>('gpt')
-  const [prompt, setPrompt] = useState(
-    '바이브코딩 입문자를 위해 OKF의 개요, 특징, 활용 방법을 설명해주겠어?',
-  )
+  const [provider, setProvider] = useState<ChatProviderSelection>('gpt')
+  const [prompt, setPrompt] = useState(PROMPT_EXAMPLES[0].prompt)
   const [loading, setLoading] = useState(false)
-  const [chatResult, setChatResult] = useState<ChatResult | null>(null)
+  const [chatResult, setChatResult] = useState<ChatResult | AutoChatResult | null>(
+    null,
+  )
   const [compareItems, setCompareItems] = useState<CompareItem[] | null>(null)
   const [comparePrompt, setComparePrompt] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -55,8 +61,13 @@ export default function App() {
 
     try {
       if (mode === 'chat') {
-        const result = await chat(provider, trimmed)
-        setChatResult(result)
+        if (provider === 'auto') {
+          const result = await autoChat(trimmed)
+          setChatResult(result)
+        } else {
+          const result = await chat(provider, trimmed)
+          setChatResult(result)
+        }
       } else {
         const items = await compare(trimmed)
         setCompareItems(items)
@@ -73,10 +84,10 @@ export default function App() {
     <div className="mx-auto flex min-h-svh max-w-5xl flex-col px-4 py-8 sm:px-6 sm:py-12">
       <header className="mb-8 text-left">
         <p className="mb-2 font-[family-name:var(--mono)] text-xs tracking-[0.2em] text-[var(--accent-deep)] uppercase">
-          KPC · AI Gateway Lab
+          Goorm AI Gateway
         </p>
         <h1 className="font-[family-name:var(--display)] text-4xl font-bold tracking-tight text-[var(--ink)] sm:text-5xl">
-          Multi LLM Router
+          Multi LLM Playground
         </h1>
         <p className="mt-3 max-w-2xl text-base text-[var(--muted)] sm:text-lg">
           GPT, Gemini, Claude, Perplexity를 하나의 게이트웨이에서 호출하고
@@ -137,7 +148,12 @@ export default function App() {
         />
 
         {mode === 'chat' ? (
-          <ChatWindow result={chatResult} loading={loading} error={error} />
+          <ChatWindow
+            result={chatResult}
+            loading={loading}
+            error={error}
+            autoMode={provider === 'auto'}
+          />
         ) : (
           <CompareView
             prompt={comparePrompt}

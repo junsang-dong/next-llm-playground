@@ -1,5 +1,7 @@
 export type ProviderId = 'gpt' | 'gemini' | 'claude' | 'perplexity'
 
+export type ChatProviderSelection = ProviderId | 'auto'
+
 export interface ChatResult {
   provider: ProviderId
   model: string
@@ -37,4 +39,25 @@ export const DEFAULT_MODELS: Record<ProviderId, string> = {
   gemini: 'gemini-2.5-flash',
   claude: 'claude-haiku-4-5',
   perplexity: 'sonar',
+}
+
+export interface OrchestrationVote {
+  voter: ProviderId
+  recommended: ProviderId
+  reason: string
+}
+
+export interface AutoChatResult extends ChatResult {
+  orchestration: {
+    selectedProvider: ProviderId
+    votes: OrchestrationVote[]
+    routingElapsed: number
+    totalEstimatedCost: number
+  }
+}
+
+export function isAutoChatResult(
+  result: ChatResult | AutoChatResult,
+): result is AutoChatResult {
+  return 'orchestration' in result
 }

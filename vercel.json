@@ -5,6 +5,9 @@
     },
     "api/compare.ts": {
       "maxDuration": 60
+    },
+    "api/auto.ts": {
+      "maxDuration": 60
     }
   },
   "rewrites": [

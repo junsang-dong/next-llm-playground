@@ -1,9 +1,9 @@
-import type { ProviderId } from '../types'
+import type { ChatProviderSelection } from '../types'
 import { DEFAULT_MODELS, PROVIDER_LABELS, PROVIDERS } from '../types'
 
 interface ModelSelectorProps {
-  value: ProviderId
-  onChange: (provider: ProviderId) => void
+  value: ChatProviderSelection
+  onChange: (selection: ChatProviderSelection) => void
   disabled?: boolean
 }
 
@@ -13,7 +13,7 @@ export function ModelSelector({ value, onChange, disabled }: ModelSelectorProps)
       <legend className="text-sm font-medium tracking-wide text-[var(--muted)] uppercase">
         Model
       </legend>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
         {PROVIDERS.map((provider) => {
           const selected = value === provider
           return (
@@ -43,6 +43,30 @@ export function ModelSelector({ value, onChange, disabled }: ModelSelectorProps)
             </label>
           )
         })}
+        <label
+          className={[
+            'cursor-pointer rounded-xl border px-3 py-3 text-left transition',
+            'border-[var(--accent-deep)] bg-[var(--accent-deep)] text-white hover:bg-[var(--accent)]',
+            value === 'auto'
+              ? 'shadow-[0_0_0_2px_var(--accent-deep)] ring-1 ring-sky-800'
+              : '',
+            disabled ? 'opacity-60' : '',
+          ].join(' ')}
+        >
+          <input
+            type="radio"
+            name="provider"
+            className="sr-only"
+            checked={value === 'auto'}
+            onChange={() => onChange('auto')}
+          />
+          <div className="font-[family-name:var(--display)] text-base font-semibold text-white">
+            AUTO
+          </div>
+          <div className="mt-1 font-[family-name:var(--mono)] text-xs text-sky-100">
+            Multi-LLM 협의
+          </div>
+        </label>
       </div>
     </fieldset>
   )

@@ -1,19 +1,34 @@
-import type { ChatResult } from '../types'
+import { useState } from 'react'
+import type { AutoChatResult, ChatResult } from '../types'
+import { isAutoChatResult } from '../types'
 import { CostCard } from './CostCard'
+import { OrchestrationSummary } from './OrchestrationSummary'
 import { ResponseCard } from './ResponseCard'
+import { ResponseViewToggle } from './ResponseViewToggle'
+import type { ResponseViewMode } from './ResponseViewToggle'
 import { SpeedCard } from './SpeedCard'
 
 interface ChatWindowProps {
-  result: ChatResult | null
+  result: ChatResult | AutoChatResult | null
   loading: boolean
   error: string | null
+  autoMode?: boolean
 }
 
-export function ChatWindow({ result, loading, error }: ChatWindowProps) {
+export function ChatWindow({
+  result,
+  loading,
+  error,
+  autoMode = false,
+}: ChatWindowProps) {
+  const [viewMode, setViewMode] = useState<ResponseViewMode>('markdown')
+
   if (loading) {
     return (
       <div className="rounded-2xl border border-dashed border-sky-300 bg-sky-50/60 px-5 py-10 text-center text-[var(--muted)]">
-        모델을 호출하는 중…
+        {autoMode
+          ? '멀티 LLM이 질문을 분석하고 최적 모델을 협의하는 중…'
+          : '모델을 호출하는 중…'}
       </div>
     )
   }
@@ -36,7 +51,11 @@ export function ChatWindow({ result, loading, error }: ChatWindowProps) {
 
   return (
     <div className="space-y-4">
-      <ResponseCard result={result} />
+      <ResponseViewToggle value={viewMode} onChange={setViewMode} />
+      {isAutoChatResult(result) && (
+        <OrchestrationSummary orchestration={result.orchestration} />
+      )}
+      <ResponseCard result={result} viewMode={viewMode} />
       <div className="grid gap-4 sm:grid-cols-2">
         <SpeedCard elapsed={result.elapsed} />
         <CostCard

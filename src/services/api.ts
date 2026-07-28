@@ -1,4 +1,4 @@
-import type { ChatResult, CompareItem, ProviderId } from '../types'
+import type { AutoChatResult, ChatResult, CompareItem, ProviderId } from '../types'
 
 const VOUCHER_STORAGE_KEY = 'kpc-multi-llm-voucher'
 
@@ -72,4 +72,14 @@ export async function compare(prompt: string): Promise<CompareItem[]> {
     body: JSON.stringify({ prompt, voucher }),
   })
   return parseJson<CompareItem[]>(res)
+}
+
+export async function autoChat(prompt: string): Promise<AutoChatResult> {
+  const voucher = requireVoucher()
+  const res = await fetch('/api/auto', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt, voucher }),
+  })
+  return parseJson<AutoChatResult>(res)
 }

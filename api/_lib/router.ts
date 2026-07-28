@@ -1,5 +1,5 @@
 import type { ChatResult, ProviderId } from './types.js'
-import { DEFAULT_MODELS } from './types.js'
+import { DEFAULT_MODELS, PROVIDERS } from './types.js'
 import { callOpenAI } from './providers/openai.js'
 import { callGemini } from './providers/gemini.js'
 import { callAnthropic } from './providers/anthropic.js'
@@ -35,4 +35,17 @@ export async function routeChat(
 
 export function defaultModel(provider: ProviderId): string {
   return DEFAULT_MODELS[provider]
+}
+
+const API_KEY_ENV: Record<ProviderId, string> = {
+  gpt: 'OPENAI_API_KEY',
+  gemini: 'GOOGLE_API_KEY',
+  claude: 'ANTHROPIC_API_KEY',
+  perplexity: 'PERPLEXITY_API_KEY',
+}
+
+export function getAvailableProviders(): ProviderId[] {
+  return PROVIDERS.filter((provider) =>
+    Boolean(process.env[API_KEY_ENV[provider]]?.trim()),
+  )
 }

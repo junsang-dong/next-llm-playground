@@ -38,6 +38,9 @@ function localApiPlugin(): Plugin {
           const { routeChat, isProviderId } = await server.ssrLoadModule(
             '/api/_lib/router.ts',
           )
+          const { runOrchestration } = await server.ssrLoadModule(
+            '/api/_lib/orchestrator.ts',
+          )
           const {
             PROVIDERS,
             DEFAULT_MODELS,
@@ -134,6 +137,40 @@ function localApiPlugin(): Plugin {
             res.statusCode = 200
             res.setHeader('Content-Type', 'application/json')
             res.end(JSON.stringify(results))
+            return
+          }
+
+          if (url === '/api/auto' && req.method === 'POST') {
+            const prompt =
+              typeof body?.prompt === 'string' ? body.prompt.trim() : ''
+            const voucherIssue = voucherError(body?.voucher)
+
+            if (voucherIssue) {
+              res.statusCode = 401
+              res.setHeader('Content-Type', 'application/json')
+              res.end(JSON.stringify({ error: voucherIssue }))
+              return
+            }
+
+            if (!prompt) {
+              res.statusCode = 400
+              res.setHeader('Content-Type', 'application/json')
+              res.end(JSON.stringify({ error: 'prompt is required' }))
+              return
+            }
+
+            try {
+              const result = await runOrchestration(prompt)
+              res.statusCode = 200
+              res.setHeader('Content-Type', 'application/json')
+              res.end(JSON.stringify(result))
+            } catch (error) {
+              const message =
+                error instanceof Error ? error.message : 'Unknown error'
+              res.statusCode = 502
+              res.setHeader('Content-Type', 'application/json')
+              res.end(JSON.stringify({ error: message }))
+            }
             return
           }
 

@@ -44,3 +44,18 @@ export const PROVIDER_LABELS: Record<ProviderId, string> = {
   claude: 'Claude',
   perplexity: 'Perplexity',
 }
+
+export interface OrchestrationVote {
+  voter: ProviderId
+  recommended: ProviderId
+  reason: string
+}
+
+export interface AutoChatResult extends ChatResult {
+  orchestration: {
+    selectedProvider: ProviderId
+    votes: OrchestrationVote[]
+    routingElapsed: number
+    totalEstimatedCost: number
+  }
+}
