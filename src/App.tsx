@@ -11,9 +11,10 @@ import {
 import { PromptInput, PROMPT_EXAMPLES } from './components/PromptInput'
 import { SettingsPanel } from './components/SettingsPanel'
 import { SlideMenu, type AppView } from './components/SlideMenu'
-import { VoucherGate } from './components/VoucherGate'
+import { AccessGate } from './components/AccessGate'
 import { isValidModelForProvider } from './constants/models'
 import { useLocalStorage } from './hooks/useLocalStorage'
+import { useAuth } from './contexts/AuthContext'
 import {
   autoChat,
   chat,
@@ -28,6 +29,10 @@ import {
   HISTORY_STORAGE_KEY,
   prependHistory,
 } from './services/history'
+import {
+  getGuestTrialRemaining,
+  recordGuestTrialUse,
+} from './services/guestTrial'
 import type {
   AutoChatResult,
   ChatResult,
@@ -45,6 +50,7 @@ function initialModels(): Record<ProviderId, string> {
 }
 
 export default function App() {
+  const { user, authLoading, signOutGoogle } = useAuth()
   const [activeView, setActiveView] = useState<AppView>('chat')
   const [mode, setMode] = useState<'chat' | 'compare'>('chat')
   const [provider, setProvider] = useState<ChatProviderSelection>('gpt')
@@ -68,10 +74,21 @@ export default function App() {
     HISTORY_STORAGE_KEY,
     [],
   )
-  const [unlocked, setUnlocked] = useState(() => {
+  const [guestTrialTick, setGuestTrialTick] = useState(0)
+  const [voucherUnlocked, setVoucherUnlocked] = useState(() => {
     const stored = getStoredVoucher()
     return Boolean(stored && isExpectedVoucher(stored))
   })
+
+  const unlocked = Boolean(user && voucherUnlocked && !authLoading)
+  const guestTrialRemaining = useMemo(() => {
+    void guestTrialTick
+    return getGuestTrialRemaining()
+  }, [guestTrialTick])
+  const guestAccess = Boolean(
+    !user && !authLoading && guestTrialRemaining > 0,
+  )
+  const canExecute = unlocked || guestAccess
 
   const handleNavigate = useCallback((view: AppView) => {
     setActiveView(view)
@@ -90,14 +107,19 @@ export default function App() {
   function handleUnlock(code: string) {
     if (!isExpectedVoucher(code)) return false
     storeVoucher(code.trim())
-    setUnlocked(true)
+    setVoucherUnlocked(true)
     setError(null)
     return true
   }
 
-  function handleLock() {
+  function handleVoucherLock() {
     clearStoredVoucher()
-    setUnlocked(false)
+    setVoucherUnlocked(false)
+  }
+
+  async function handleGoogleSignOut() {
+    handleVoucherLock()
+    await signOutGoogle()
   }
 
   function handleProviderChange(next: ChatProviderSelection) {
@@ -147,8 +169,11 @@ export default function App() {
 
   async function handleSubmit() {
     const trimmed = prompt.trim()
-    if (!trimmed || loading || !unlocked) return
+    if (!trimmed || loading || !canExecute) return
     if (activeView === 'settings' || activeView === 'about') return
+
+    const useGuestTrial = guestAccess
+    const apiOpts = useGuestTrial ? { guestTrial: true as const } : undefined
 
     setLoading(true)
     setError(null)
@@ -156,7 +181,7 @@ export default function App() {
     try {
       if (mode === 'chat') {
         if (provider === 'auto') {
-          const result = await autoChat(trimmed)
+          const result = await autoChat(trimmed, apiOpts)
           setChatResult(result)
           setCompareItems(null)
           setHistory((prev) =>
@@ -173,7 +198,7 @@ export default function App() {
           setSelectedHistoryId(null)
         } else {
           const model = modelsByProvider[provider]
-          const result = await chat(provider, trimmed, model)
+          const result = await chat(provider, trimmed, model, apiOpts)
           setChatResult(result)
           setCompareItems(null)
           setHistory((prev) =>
@@ -191,7 +216,7 @@ export default function App() {
           setSelectedHistoryId(null)
         }
       } else {
-        const items = await compare(trimmed)
+        const items = await compare(trimmed, apiOpts)
         setCompareItems(items)
         setComparePrompt(trimmed)
         setChatResult(null)
@@ -208,6 +233,10 @@ export default function App() {
           ),
         )
         setSelectedHistoryId(null)
+      }
+      if (useGuestTrial) {
+        recordGuestTrialUse()
+        setGuestTrialTick((t) => t + 1)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Request failed')
@@ -285,16 +314,21 @@ export default function App() {
         속도·비용·품질을 비교합니다.
       </p>
       <main className="space-y-6 rounded-[28px] border border-white/70 bg-white/55 p-5 shadow-[0_20px_60px_-40px_rgba(3,105,161,0.45)] backdrop-blur-sm sm:p-8">
-        <VoucherGate
-          unlocked={unlocked}
+        <AccessGate
+          voucherUnlocked={voucherUnlocked}
+          guestTrialRemaining={guestTrialRemaining}
           onUnlock={handleUnlock}
-          onLock={handleLock}
+          onVoucherLock={handleVoucherLock}
         />
 
         {activeView === 'settings' && (
           <SettingsPanel
             unlocked={unlocked}
-            onLock={handleLock}
+            voucherUnlocked={voucherUnlocked}
+            guestTrialRemaining={guestTrialRemaining}
+            onGuestTrialReset={() => setGuestTrialTick((t) => t + 1)}
+            onVoucherLock={handleVoucherLock}
+            onGoogleSignOut={() => void handleGoogleSignOut()}
             onClearHistory={() => {
               setHistory([])
               setSelectedHistoryId(null)
@@ -312,7 +346,7 @@ export default function App() {
                 onChange={handleProviderChange}
                 modelsByProvider={modelsByProvider}
                 onModelChange={handleModelChange}
-                disabled={loading || !unlocked}
+                disabled={loading || !canExecute}
               />
             )}
 
@@ -320,8 +354,8 @@ export default function App() {
               value={prompt}
               onChange={setPrompt}
               onSubmit={handleSubmit}
-              disabled={loading || !unlocked}
-              locked={!unlocked}
+              disabled={loading || !canExecute}
+              locked={!canExecute}
             />
 
             {mode === 'chat' ? (

@@ -1,23 +1,23 @@
 # Multi LLM Playground
 
-![Goorm AI Gateway · Multi LLM Playground — 접이식 사이드바 UI](doc/app-preview.png)
+![Goorm AI Gateway · Multi LLM Playground — 접이식 사이드바 · Chat/Compare/AUTO](doc/app-preview.png)
 
-**Goorm AI Gateway** — 하나의 UI에서 GPT, Gemini, Claude, Perplexity를 선택·비교하거나, AUTO 모드로 멀티 LLM이 협의해 최적 모델에 응답을 맡기는 AI Gateway 학습용 앱입니다.
+**Goorm AI Gateway** — 하나의 UI에서 GPT, Gemini, Claude, Perplexity를 선택·비교하거나, AUTO 모드로 멀티 LLM이 협의해 최적 모델에 응답을 맡기는 AI Gateway 학습용 앱입니다. **미로그인 방문자**는 Chat·Compare·AUTO 합산 **3회 무료 체험** 후, **Google 로그인 + 바우처**로 무제한 사용할 수 있습니다.
 
 ## 기술 스택
 
-- Frontend: React + Vite + TypeScript + Tailwind CSS + Lucide + react-markdown
+- Frontend: React + Vite + TypeScript + Tailwind CSS + Lucide + react-markdown + **Firebase Auth**
 - Backend: Vercel Serverless Functions (`/api/chat`, `/api/compare`, `/api/auto`)
 - Provider Adapter: 공통 인터페이스로 4개 LLM 추상화
 - Local Dev: Vite 미들웨어로 `/api`를 동일 포트에서 처리
-- Client Storage: `sessionStorage`(바우처), `localStorage`(히스토리·사이드바 상태)
+- Client Storage: `sessionStorage`(바우처), `localStorage`(히스토리·사이드바·방문자 체험 횟수)
 
 ## 시작하기
 
 ```bash
 npm install
 cp .env.example .env
-# .env에 API 키·바우처 코드 입력
+# .env에 API 키·바우처·Firebase(Web) 설정 입력
 ```
 
 ### 로컬 실행 (권장)
@@ -52,21 +52,46 @@ PERPLEXITY_API_KEY=
 VOUCHER_CODE=
 ```
 
-클라이언트 인증 UI용 (Vite `VITE_` prefix):
+클라이언트 (Vite `VITE_` prefix):
 
 ```
 VITE_VOUCHER_CODE=
+VITE_FIREBASE_API_KEY=
+VITE_FIREBASE_AUTH_DOMAIN=
+VITE_FIREBASE_PROJECT_ID=
+VITE_FIREBASE_STORAGE_BUCKET=
+VITE_FIREBASE_MESSAGING_SENDER_ID=
+VITE_FIREBASE_APP_ID=
 ```
+
+Firebase 프로젝트 예: `goorm-vibe-login` · 웹앱 `next-multi-llm`. [Firebase Console](https://console.firebase.google.com/)에서 **Authentication → Sign-in method → Google** 활성화 및 **Authorized domains**에 `localhost`와 배포 도메인을 등록하세요. `firebase deploy`는 Hosting용이며 Vercel 배포 시 Auth만으로 동작합니다.
 
 키가 없는 provider는 해당 요청만 에러를 반환하고, Compare·AUTO 모드에서는 나머지 모델로 계속 진행합니다.
 
-## 바우처 인증
+## 인증 (방문자 체험 · Google + 바우처)
 
-프롬프트 실행 전 바우처 코드 인증이 필요합니다.
+### 방문자 (미로그인)
 
-- UI: Voucher 입력란에서 코드 인증 → 잠금 해제 후 Chat/Compare/AUTO 실행
-- API: `voucher` 필드가 없거나 `VOUCHER_CODE`와 불일치하면 `401` 반환
-- 세션: 인증 상태는 `sessionStorage`에 유지, 「잠금」으로 해제
+- Chat · Compare · AUTO **성공 1회당** 체험 1회 차감, **합산 최대 3회** (`localStorage` 키 `multi-llm-guest-trial-used`)
+- 체험 중 API는 클라이언트가 `VITE_VOUCHER_CODE`를 body에 실어 호출합니다 (서버 검증은 기존과 동일, **서버 측 체험 횟수 제한은 없음**)
+- 3회 소진 후: Google 로그인 → 바우처 입력으로 무제한 사용
+- 체험 횟수는 **브라우저·기기별**이며 시크릿 창·다른 기기에서는 별도 카운트입니다 (교육용 MVP)
+
+### 로그인 사용자
+
+프롬프트 실행 전 **Google 로그인**과 **바우처 코드**가 **모두** 필요합니다.
+
+1. **Google**: Firebase Auth `signInWithPopup` (클라이언트)
+2. **바우처**: `sessionStorage` + API body `voucher`
+3. **실행 가능**: Google 세션 O **AND** 바우처 O
+4. **바우처 잠금**: 바우처만 해제 (Google 세션 유지)
+5. **Google 로그아웃** (Settings): Firebase signOut + 바우처 삭제
+
+API는 서버 [`api/_lib/voucher.ts`](api/_lib/voucher.ts) 검증을 유지합니다 (Firebase ID 토큰 서버 검증은 범위 외).
+
+## 바우처 (API)
+
+서버는 요청 body의 `voucher`가 `VOUCHER_CODE`와 일치하는지 확인합니다. 클라이언트 UI 게이트와 별개로, 직접 API 호출 시에도 동일 코드가 필요합니다.
 
 ## 주요 기능
 
@@ -128,23 +153,36 @@ Compare는 4 provider 병렬. AUTO는 Council 표결 + 최종 응답 및 `orches
 
 ## 변경 이력 (최근)
 
-### 주요 내용
+### 이번 작업 — Google 로그인 · 방문자 무료 체험 3회
 
-- **접이식 사이드바 UI**: ChatGPT 유사 레이아웃, 패널 토글 아이콘, `AppShell` 전체 높이 레이아웃
-- **REQ Features** ([doc/REQ Features.md](doc/REQ%20Features.md)): 히스토리, provider별 모델 Select, Slide Menu(Settings/About)
+#### 주요 내용
+
+- **Firebase Google 로그인**: `src/lib/firebase.ts`(env 기반 초기화), `AuthContext` + `main.tsx`의 `AuthProvider`, `signInWithPopup` / `signOut`
+- **AccessGate 통합**: 미로그인·로그인·바우처 상태별 UI — Google 프로필, 바우처 입력, 녹색 인증 완료 배너, 바우처 잠금
+- **실행 조건**: `unlocked`(Google **AND** 바우처) 또는 방문자 `canExecute`(체험 잔여 > 0); `PromptInput` / `ModelSelector`는 `canExecute` 기준
+- **방문자 무료 체험 3회**: `src/services/guestTrial.ts` — 키 `multi-llm-guest-trial-used`, Chat·Compare·AUTO **성공 1회당** 1회 차감
+- **체험 중 API**: `api.ts`의 `getVoucherForRequest({ guestTrial: true })` → `VITE_VOUCHER_CODE` (서버 `voucher.ts` 변경 없음)
+- **AccessGate 체험 UI**: 잔여 `N/3` sky 배너 + Google 로그인(선택); 3회 소진 시 Google 로그인 필수 안내
+- **Settings**: Google 계정·바우처 상태, 방문자 체험 사용량·초기화(교육·디버그), Google 로그아웃 시 바우처 삭제
+- **`.env.example`**: `VITE_FIREBASE_*` 항목 추가 (Analytics 미사용)
+
+#### 오류·UX 보완
+
+- **API 실패 시 체험 미차감**: `recordGuestTrialUse()`는 `handleSubmit` 성공 분기에서만 호출
+- **authLoading** 동안 프롬프트 제출·체험 판정 지연 (로딩 중 잘못된 게이트 방지)
+- 체험 배너 잔여 횟수: `guestTrialTick` + `useMemo`로 성공 직후 UI 즉시 갱신
+- Firebase env 누락 시 Google 버튼 비활성 + 안내 (초기화 실패로 앱 크래시 방지)
+- Google 팝업 차단·취소·기타 Auth 오류 한국어 메시지 (`AuthContext`)
+- 체험 소진 방문자: 입력·모델 UI `locked` / `disabled`로 제출 차단
+- 로그인+바우처 사용자는 체험 localStorage와 무관하게 무제한 실행
+
+### 이전 릴리스 요약
+
+- **접이식 사이드바 UI**: ChatGPT 유사 레이아웃, `AppShell`, 패널 토글, History
+- **REQ Features** ([doc/REQ Features.md](doc/REQ%20Features.md)): 히스토리, provider별 모델 Select, Settings/About
 - **AUTO 오케스트레이션**: `/api/auto`, 협의 요약 UI
-- **응답 보기**: 마크다운 / 웹뷰 전환
-- **Prompt 예시 뱃지** 5종, **Goorm AI Gateway** / **Multi LLM Playground** 브랜딩
-- **바우처 게이트** 및 서버 `/api/*` 검증
-
-### 오류·UX 보완
-
-- API 직접 호출 우회 방지를 위한 서버 바우처 검증 (`401`)
-- 미인증 시 입력·모델 UI 비활성화
-- AUTO Council: provider별 실패 격리, 무효 표·최종 호출 실패 시 `502`와 명확한 메시지
-- 히스토리 복원 시 Chat/Compare/AUTO 모드·모델 id 일치 검증 후 Select 상태 반영
-- 모바일 첫 진입 시 사이드바 닫힘, 데스크톱은 열림 기본값 (localStorage로 유지)
-- 미지원 API 모델 id 호출 시 provider API 에러를 기존 Chat 에러 UI로 표시
+- **응답 보기**: 마크다운 / 웹뷰 전환 · **Prompt 예시 뱃지** 5종 · Goorm 브랜딩
+- 서버 `/api/*` 바우처 검증 (`401`), AUTO Council provider별 실패 겹리, 히스토리 복원 시 모델 id 검증
 
 ## 배포
 
