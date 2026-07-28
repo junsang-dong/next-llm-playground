@@ -7,9 +7,16 @@ const PRICING: Record<
   { input: number; output: number }
 > = {
   'gpt-4o-mini': { input: 0.15, output: 0.6 },
+  'gpt-4o': { input: 2.5, output: 10 },
+  'gpt-5-mini': { input: 0.25, output: 2 },
+  'gpt-5': { input: 1.25, output: 10 },
   'gemini-2.5-flash': { input: 0.3, output: 2.5 },
+  'gemini-2.5-pro': { input: 1.25, output: 10 },
   'claude-haiku-4-5': { input: 1.0, output: 5.0 },
+  'claude-sonnet-4-5': { input: 3.0, output: 15.0 },
+  'claude-opus-4-5': { input: 15.0, output: 75.0 },
   sonar: { input: 1.0, output: 1.0 },
+  'sonar-pro': { input: 3.0, output: 15.0 },
 }
 
 export function estimateCost(

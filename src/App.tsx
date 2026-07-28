@@ -1,10 +1,19 @@
-import { useState } from 'react'
-import { GitCompareArrows, MessageSquare } from 'lucide-react'
-import { ModelSelector } from './components/ModelSelector'
-import { PromptInput, PROMPT_EXAMPLES } from './components/PromptInput'
+import { useCallback, useMemo, useState } from 'react'
+import { AboutPanel } from './components/AboutPanel'
+import { AppShell } from './components/AppShell'
 import { ChatWindow } from './components/ChatWindow'
 import { CompareView } from './components/CompareView'
+import { HistoryList } from './components/HistoryList'
+import {
+  defaultModelForProvider,
+  ModelSelector,
+} from './components/ModelSelector'
+import { PromptInput, PROMPT_EXAMPLES } from './components/PromptInput'
+import { SettingsPanel } from './components/SettingsPanel'
+import { SlideMenu, type AppView } from './components/SlideMenu'
 import { VoucherGate } from './components/VoucherGate'
+import { isValidModelForProvider } from './constants/models'
+import { useLocalStorage } from './hooks/useLocalStorage'
 import {
   autoChat,
   chat,
@@ -14,18 +23,33 @@ import {
   isExpectedVoucher,
   storeVoucher,
 } from './services/api'
+import {
+  buildHistoryPayload,
+  HISTORY_STORAGE_KEY,
+  prependHistory,
+} from './services/history'
 import type {
   AutoChatResult,
   ChatResult,
   ChatProviderSelection,
   CompareItem,
+  ProviderId,
 } from './types'
+import type { HistoryEntry } from './types/history'
+import { PROVIDERS } from './types'
 
-type Mode = 'chat' | 'compare'
+function initialModels(): Record<ProviderId, string> {
+  return Object.fromEntries(
+    PROVIDERS.map((p) => [p, defaultModelForProvider(p)]),
+  ) as Record<ProviderId, string>
+}
 
 export default function App() {
-  const [mode, setMode] = useState<Mode>('chat')
+  const [activeView, setActiveView] = useState<AppView>('chat')
+  const [mode, setMode] = useState<'chat' | 'compare'>('chat')
   const [provider, setProvider] = useState<ChatProviderSelection>('gpt')
+  const [modelsByProvider, setModelsByProvider] =
+    useState<Record<ProviderId, string>>(initialModels)
   const [prompt, setPrompt] = useState(PROMPT_EXAMPLES[0].prompt)
   const [loading, setLoading] = useState(false)
   const [chatResult, setChatResult] = useState<ChatResult | AutoChatResult | null>(
@@ -34,10 +58,34 @@ export default function App() {
   const [compareItems, setCompareItems] = useState<CompareItem[] | null>(null)
   const [comparePrompt, setComparePrompt] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [sidebarOpen, setSidebarOpen] = useLocalStorage<boolean>(
+    'multi-llm-sidebar-open',
+    typeof window !== 'undefined' &&
+      window.matchMedia('(min-width: 768px)').matches,
+  )
+  const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null)
+  const [history, setHistory] = useLocalStorage<HistoryEntry[]>(
+    HISTORY_STORAGE_KEY,
+    [],
+  )
   const [unlocked, setUnlocked] = useState(() => {
     const stored = getStoredVoucher()
     return Boolean(stored && isExpectedVoucher(stored))
   })
+
+  const handleNavigate = useCallback((view: AppView) => {
+    setActiveView(view)
+    setError(null)
+    if (view === 'compare') {
+      setMode('compare')
+    } else if (view === 'auto') {
+      setMode('chat')
+      setProvider('auto')
+    } else if (view === 'chat') {
+      setMode('chat')
+      setProvider((prev) => (prev === 'auto' ? 'gpt' : prev))
+    }
+  }, [])
 
   function handleUnlock(code: string) {
     if (!isExpectedVoucher(code)) return false
@@ -52,9 +100,55 @@ export default function App() {
     setUnlocked(false)
   }
 
+  function handleProviderChange(next: ChatProviderSelection) {
+    setProvider(next)
+    if (next === 'auto') {
+      setActiveView('auto')
+      setMode('chat')
+    } else {
+      setActiveView(mode === 'compare' ? 'compare' : 'chat')
+    }
+  }
+
+  function handleModelChange(providerId: ProviderId, modelId: string) {
+    setModelsByProvider((prev) => ({ ...prev, [providerId]: modelId }))
+  }
+
+  const applyHistoryEntry = useCallback((entry: HistoryEntry) => {
+    setSelectedHistoryId(entry.id)
+    setPrompt(entry.prompt)
+    setError(null)
+
+    if (entry.mode === 'compare') {
+      setMode('compare')
+      setActiveView('compare')
+      setComparePrompt(entry.comparePrompt ?? entry.prompt)
+      setCompareItems(entry.compareItems ?? null)
+      setChatResult(null)
+    } else {
+      setMode('chat')
+      setActiveView(entry.mode === 'auto' ? 'auto' : 'chat')
+      setProvider(entry.provider)
+      setChatResult(entry.chatResult ?? null)
+      setCompareItems(null)
+      setComparePrompt('')
+      if (
+        entry.provider !== 'auto' &&
+        entry.model &&
+        isValidModelForProvider(entry.provider, entry.model)
+      ) {
+        setModelsByProvider((prev) => ({
+          ...prev,
+          [entry.provider]: entry.model!,
+        }))
+      }
+    }
+  }, [])
+
   async function handleSubmit() {
     const trimmed = prompt.trim()
     if (!trimmed || loading || !unlocked) return
+    if (activeView === 'settings' || activeView === 'about') return
 
     setLoading(true)
     setError(null)
@@ -64,14 +158,56 @@ export default function App() {
         if (provider === 'auto') {
           const result = await autoChat(trimmed)
           setChatResult(result)
+          setCompareItems(null)
+          setHistory((prev) =>
+            prependHistory(
+              prev,
+              buildHistoryPayload({
+                prompt: trimmed,
+                mode: 'chat',
+                provider: 'auto',
+                chatResult: result,
+              }),
+            ),
+          )
+          setSelectedHistoryId(null)
         } else {
-          const result = await chat(provider, trimmed)
+          const model = modelsByProvider[provider]
+          const result = await chat(provider, trimmed, model)
           setChatResult(result)
+          setCompareItems(null)
+          setHistory((prev) =>
+            prependHistory(
+              prev,
+              buildHistoryPayload({
+                prompt: trimmed,
+                mode: 'chat',
+                provider,
+                model,
+                chatResult: result,
+              }),
+            ),
+          )
+          setSelectedHistoryId(null)
         }
       } else {
         const items = await compare(trimmed)
         setCompareItems(items)
         setComparePrompt(trimmed)
+        setChatResult(null)
+        setHistory((prev) =>
+          prependHistory(
+            prev,
+            buildHistoryPayload({
+              prompt: trimmed,
+              mode: 'compare',
+              provider: 'gpt',
+              compareItems: items,
+              comparePrompt: trimmed,
+            }),
+          ),
+        )
+        setSelectedHistoryId(null)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Request failed')
@@ -80,50 +216,74 @@ export default function App() {
     }
   }
 
+  const showPlayground =
+    activeView === 'chat' ||
+    activeView === 'compare' ||
+    activeView === 'auto'
+
+  const historyPanel = useMemo(
+    () => (
+      <HistoryList
+        entries={history}
+        selectedId={selectedHistoryId}
+        onSelect={applyHistoryEntry}
+        onClear={() => {
+          setHistory([])
+          setSelectedHistoryId(null)
+        }}
+      />
+    ),
+    [history, selectedHistoryId, setHistory, applyHistoryEntry],
+  )
+
   return (
-    <div className="mx-auto flex min-h-svh max-w-5xl flex-col px-4 py-8 sm:px-6 sm:py-12">
-      <header className="mb-8 text-left">
-        <p className="mb-2 font-[family-name:var(--mono)] text-xs tracking-[0.2em] text-[var(--accent-deep)] uppercase">
-          Goorm AI Gateway
-        </p>
-        <h1 className="font-[family-name:var(--display)] text-4xl font-bold tracking-tight text-[var(--ink)] sm:text-5xl">
-          Multi LLM Playground
-        </h1>
-        <p className="mt-3 max-w-2xl text-base text-[var(--muted)] sm:text-lg">
-          GPT, Gemini, Claude, Perplexity를 하나의 게이트웨이에서 호출하고
-          속도·비용·품질을 비교합니다.
-        </p>
-      </header>
-
-      <div className="mb-6 inline-flex w-fit rounded-xl border border-[var(--line)] bg-white/80 p-1 shadow-sm">
-        <button
-          type="button"
-          onClick={() => setMode('chat')}
-          className={[
-            'inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition',
-            mode === 'chat'
-              ? 'bg-[var(--accent-deep)] text-white'
-              : 'text-[var(--muted)] hover:text-[var(--ink)]',
-          ].join(' ')}
-        >
-          <MessageSquare size={16} />
-          Chat
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode('compare')}
-          className={[
-            'inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition',
-            mode === 'compare'
-              ? 'bg-[var(--accent-deep)] text-white'
-              : 'text-[var(--muted)] hover:text-[var(--ink)]',
-          ].join(' ')}
-        >
-          <GitCompareArrows size={16} />
-          Compare
-        </button>
-      </div>
-
+    <AppShell
+      sidebarOpen={sidebarOpen}
+      onSidebarOpenChange={setSidebarOpen}
+      sidebar={
+        <SlideMenu
+          activeView={activeView}
+          onNavigate={handleNavigate}
+          historyPanel={historyPanel}
+          onAfterNavigate={() => {
+            if (window.matchMedia('(max-width: 767px)').matches) {
+              setSidebarOpen(false)
+            }
+          }}
+        />
+      }
+      topBar={
+        <div className="min-w-0 py-0.5">
+          <p className="truncate font-[family-name:var(--mono)] text-[10px] tracking-[0.15em] text-[var(--accent-deep)] uppercase sm:text-xs">
+            Goorm AI Gateway
+          </p>
+          <h1 className="truncate font-[family-name:var(--display)] text-lg font-bold tracking-tight text-[var(--ink)] sm:text-xl">
+            Multi LLM Playground
+          </h1>
+        </div>
+      }
+      footer={
+        <footer className="text-center text-xs text-[var(--muted)]">
+          <p>API keys stay on the server · USD × 1400 ≈ KRW</p>
+          <p className="mt-1">
+            Developed by JUN ·{' '}
+            <a
+              href="https://nextplatform.net"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline decoration-[var(--line)] underline-offset-2 hover:text-[var(--accent-deep)]"
+            >
+              NextPlatform
+            </a>{' '}
+            | React · Vite · TypeScript · Vercel
+          </p>
+        </footer>
+      }
+    >
+      <p className="mb-6 text-sm text-[var(--muted)]">
+        GPT, Gemini, Claude, Perplexity를 하나의 게이트웨이에서 호출하고
+        속도·비용·품질을 비교합니다.
+      </p>
       <main className="space-y-6 rounded-[28px] border border-white/70 bg-white/55 p-5 shadow-[0_20px_60px_-40px_rgba(3,105,161,0.45)] backdrop-blur-sm sm:p-8">
         <VoucherGate
           unlocked={unlocked}
@@ -131,58 +291,57 @@ export default function App() {
           onLock={handleLock}
         />
 
-        {mode === 'chat' && (
-          <ModelSelector
-            value={provider}
-            onChange={setProvider}
-            disabled={loading || !unlocked}
+        {activeView === 'settings' && (
+          <SettingsPanel
+            unlocked={unlocked}
+            onLock={handleLock}
+            onClearHistory={() => {
+              setHistory([])
+              setSelectedHistoryId(null)
+            }}
           />
         )}
 
-        <PromptInput
-          value={prompt}
-          onChange={setPrompt}
-          onSubmit={handleSubmit}
-          disabled={loading || !unlocked}
-          locked={!unlocked}
-        />
+        {activeView === 'about' && <AboutPanel />}
 
-        {mode === 'chat' ? (
-          <ChatWindow
-            result={chatResult}
-            loading={loading}
-            error={error}
-            autoMode={provider === 'auto'}
-          />
-        ) : (
-          <CompareView
-            prompt={comparePrompt}
-            items={compareItems}
-            loading={loading}
-            error={error}
-          />
+        {showPlayground && (
+          <>
+            {mode === 'chat' && (
+              <ModelSelector
+                value={provider}
+                onChange={handleProviderChange}
+                modelsByProvider={modelsByProvider}
+                onModelChange={handleModelChange}
+                disabled={loading || !unlocked}
+              />
+            )}
+
+            <PromptInput
+              value={prompt}
+              onChange={setPrompt}
+              onSubmit={handleSubmit}
+              disabled={loading || !unlocked}
+              locked={!unlocked}
+            />
+
+            {mode === 'chat' ? (
+              <ChatWindow
+                result={chatResult}
+                loading={loading}
+                error={error}
+                autoMode={provider === 'auto'}
+              />
+            ) : (
+              <CompareView
+                prompt={comparePrompt}
+                items={compareItems}
+                loading={loading}
+                error={error}
+              />
+            )}
+          </>
         )}
       </main>
-
-      <footer className="mt-8 space-y-1.5 text-center text-xs text-[var(--muted)]">
-        <p>API keys stay on the server · USD × 1400 ≈ KRW</p>
-        <p>
-          Developed by JUN ·{' '}
-          <a
-            href="https://nextplatform.net"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline decoration-[var(--line)] underline-offset-2 transition hover:text-[var(--accent-deep)] hover:decoration-[var(--accent)]"
-          >
-            NextPlatform
-          </a>{' '}
-          | React · Vite · TypeScript · Vercel
-        </p>
-        <p>
-          Built with Cursor · Claude Code · Codex · ChatGPT | Version 1.0.0 · ©
-          2026
-        </p>
-      </footer>
-    </div>
+    </AppShell>
   )
 }

@@ -54,12 +54,18 @@ function requireVoucher(): string {
   return voucher
 }
 
-export async function chat(provider: ProviderId, prompt: string): Promise<ChatResult> {
+export async function chat(
+  provider: ProviderId,
+  prompt: string,
+  model?: string,
+): Promise<ChatResult> {
   const voucher = requireVoucher()
+  const body: Record<string, string> = { provider, prompt, voucher }
+  if (model?.trim()) body.model = model.trim()
   const res = await fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ provider, prompt, voucher }),
+    body: JSON.stringify(body),
   })
   return parseJson<ChatResult>(res)
 }
