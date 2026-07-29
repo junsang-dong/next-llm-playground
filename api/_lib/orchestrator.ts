@@ -1,3 +1,4 @@
+import type { ChatInvokeOptions } from './knowledge.js'
 import type {
   AutoChatResult,
   OrchestrationVote,
@@ -137,6 +138,7 @@ async function collectVotes(
 
 export async function runOrchestration(
   userPrompt: string,
+  options?: ChatInvokeOptions,
 ): Promise<AutoChatResult> {
   const available = getAvailableProviders()
   if (available.length === 0) {
@@ -152,7 +154,7 @@ export async function runOrchestration(
 
   let final
   try {
-    final = await routeChat(selectedProvider, userPrompt)
+    final = await routeChat(selectedProvider, userPrompt, undefined, options)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
     throw new Error(

@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { isProviderId, routeChat } from './_lib/router.js'
+import { parseChatInvokeOptions } from './_lib/knowledge.js'
 import { voucherError } from './_lib/voucher.js'
 
 export default async function handler(
@@ -28,9 +29,11 @@ export default async function handler(
       return
     }
 
+    const knowledgeOptions = parseChatInvokeOptions(body)
+
     if (!isProviderId(provider)) {
       res.status(400).json({
-        error: 'provider must be one of: gpt, gemini, claude, perplexity',
+        error: 'provider must be one of: gpt, gemini, claude, perplexity, local',
       })
       return
     }
@@ -41,7 +44,7 @@ export default async function handler(
     }
 
     try {
-      const result = await routeChat(provider, prompt, model)
+      const result = await routeChat(provider, prompt, model, knowledgeOptions)
       res.status(200).json(result)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'

@@ -4,6 +4,7 @@ import { estimateCost, modelFor } from '../pricing.js'
 export async function callAnthropic(
   prompt: string,
   modelOverride?: string,
+  systemInstruction?: string,
 ): Promise<ChatResult> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
@@ -23,6 +24,7 @@ export async function callAnthropic(
     body: JSON.stringify({
       model,
       max_tokens: 1024,
+      ...(systemInstruction ? { system: systemInstruction } : {}),
       messages: [{ role: 'user', content: prompt }],
     }),
   })

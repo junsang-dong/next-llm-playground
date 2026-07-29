@@ -1,24 +1,20 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 
 export function useLocalStorage<T>(
   key: string,
   initialValue: T,
 ): [T, (value: T | ((prev: T) => T)) => void] {
-  const read = useCallback((): T => {
+  const initialRef = useRef(initialValue)
+
+  const [stored, setStored] = useState<T>(() => {
     try {
       const raw = localStorage.getItem(key)
-      if (raw == null) return initialValue
+      if (raw == null) return initialRef.current
       return JSON.parse(raw) as T
     } catch {
-      return initialValue
+      return initialRef.current
     }
-  }, [key, initialValue])
-
-  const [stored, setStored] = useState<T>(read)
-
-  useEffect(() => {
-    setStored(read())
-  }, [read])
+  })
 
   const setValue = useCallback(
     (value: T | ((prev: T) => T)) => {

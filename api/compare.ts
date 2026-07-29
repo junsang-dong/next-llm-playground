@@ -2,12 +2,17 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import type { CompareItem, ProviderId } from './_lib/types.js'
 import { DEFAULT_MODELS, PROVIDERS } from './_lib/types.js'
 import { routeChat } from './_lib/router.js'
+import { parseChatInvokeOptions, type ChatInvokeOptions } from './_lib/knowledge.js'
 import { voucherError } from './_lib/voucher.js'
 
-async function callOne(provider: ProviderId, prompt: string): Promise<CompareItem> {
+async function callOne(
+  provider: ProviderId,
+  prompt: string,
+  options?: ChatInvokeOptions,
+): Promise<CompareItem> {
   const started = Date.now()
   try {
-    return await routeChat(provider, prompt)
+    return await routeChat(provider, prompt, undefined, options)
   } catch (error) {
     const elapsed = Math.round(((Date.now() - started) / 1000) * 100) / 100
     return {
@@ -36,6 +41,7 @@ export default async function handler(
 
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body
     const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : ''
+    const knowledgeOptions = parseChatInvokeOptions(body)
     const voucherIssue = voucherError(body?.voucher)
 
     if (voucherIssue) {
@@ -49,7 +55,7 @@ export default async function handler(
     }
 
     const settled = await Promise.allSettled(
-      PROVIDERS.map((provider) => callOne(provider, prompt)),
+      PROVIDERS.map((provider) => callOne(provider, prompt, knowledgeOptions)),
     )
 
     const results: CompareItem[] = settled.map((item, index) => {

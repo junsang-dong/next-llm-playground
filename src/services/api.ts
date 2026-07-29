@@ -1,6 +1,22 @@
 import type { AutoChatResult, ChatResult, CompareItem, ProviderId } from '../types'
+import { buildKnowledgePayload } from '../types/knowledge'
+import type { KnowledgeSettings } from '../types/knowledge'
 
 const VOUCHER_STORAGE_KEY = 'kpc-multi-llm-voucher'
+
+export type ApiCallOptions = {
+  guestTrial?: boolean
+  knowledge?: KnowledgeSettings
+}
+
+function bodyWithKnowledge(
+  base: Record<string, unknown>,
+  knowledge?: KnowledgeSettings,
+): Record<string, unknown> {
+  if (!knowledge) return base
+  const extra = buildKnowledgePayload(knowledge)
+  return { ...base, ...extra }
+}
 
 export function getStoredVoucher(): string | null {
   try {
@@ -64,11 +80,18 @@ export async function chat(
   provider: ProviderId,
   prompt: string,
   model?: string,
-  options?: { guestTrial?: boolean },
+  options?: ApiCallOptions,
 ): Promise<ChatResult> {
   const voucher = getVoucherForRequest(options)
-  const body: Record<string, string> = { provider, prompt, voucher }
-  if (model?.trim()) body.model = model.trim()
+  const body = bodyWithKnowledge(
+    {
+      provider,
+      prompt,
+      voucher,
+      ...(model?.trim() ? { model: model.trim() } : {}),
+    },
+    options?.knowledge,
+  )
   const res = await fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -79,26 +102,28 @@ export async function chat(
 
 export async function compare(
   prompt: string,
-  options?: { guestTrial?: boolean },
+  options?: ApiCallOptions,
 ): Promise<CompareItem[]> {
   const voucher = getVoucherForRequest(options)
+  const body = bodyWithKnowledge({ prompt, voucher }, options?.knowledge)
   const res = await fetch('/api/compare', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt, voucher }),
+    body: JSON.stringify(body),
   })
   return parseJson<CompareItem[]>(res)
 }
 
 export async function autoChat(
   prompt: string,
-  options?: { guestTrial?: boolean },
+  options?: ApiCallOptions,
 ): Promise<AutoChatResult> {
   const voucher = getVoucherForRequest(options)
+  const body = bodyWithKnowledge({ prompt, voucher }, options?.knowledge)
   const res = await fetch('/api/auto', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt, voucher }),
+    body: JSON.stringify(body),
   })
   return parseJson<AutoChatResult>(res)
 }

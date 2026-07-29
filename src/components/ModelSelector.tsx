@@ -27,7 +27,7 @@ export function ModelSelector({
       <legend className="text-sm font-medium tracking-wide text-[var(--muted)] uppercase">
         Model
       </legend>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-6">
         {PROVIDERS.map((provider) => {
           const selected = value === provider
           return (

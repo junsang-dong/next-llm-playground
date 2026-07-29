@@ -26,6 +26,9 @@ export const MODEL_OPTIONS: Record<ProviderId, ModelOption[]> = {
     { id: 'sonar', label: 'Sonar' },
     { id: 'sonar-pro', label: 'Sonar Pro' },
   ],
+  local: [
+    { id: 'gemma-4-12b-qat', label: 'Gemma 4 12B' },
+  ],
 }
 
 export function defaultModelForProvider(provider: ProviderId): string {

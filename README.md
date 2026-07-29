@@ -1,16 +1,22 @@
 # Multi LLM Playground
 
-![Goorm AI Gateway · Multi LLM Playground — 접이식 사이드바 · Chat/Compare/AUTO](doc/app-preview.png)
+![Knowledge 패널 — System instruction · RAG 문서 선택](doc/knowledge-panel-preview.png)
 
-**Goorm AI Gateway** — 하나의 UI에서 GPT, Gemini, Claude, Perplexity를 선택·비교하거나, AUTO 모드로 멀티 LLM이 협의해 최적 모델에 응답을 맡기는 AI Gateway 학습용 앱입니다. **미로그인 방문자**는 Chat·Compare·AUTO 합산 **3회 무료 체험** 후, **Google 로그인 + 바우처**로 무제한 사용할 수 있습니다.
+![Knowledge 적용 응답 — System instruction · RAG 발췌 배지](doc/knowledge-response-preview.png)
+
+![Local LLM — LM Studio Gemma 4 Chat](doc/local-llm-preview.png)
+
+**Goorm AI Gateway** — 하나의 UI에서 GPT, Gemini, Claude, Perplexity, **Local(LM Studio)** 를 선택·비교하거나, AUTO 모드로 멀티 LLM이 협의해 최적 모델에 응답을 맡기는 AI Gateway 학습용 앱입니다. **Knowledge** 패널에서 **System instruction**과 **RAG(프로젝트 `doc/` 문서)** 를 설정할 수 있습니다. **미로그인 방문자**는 Chat·Compare·AUTO 합산 **3회 무료 체험** 후, **Google 로그인 + 바우처**로 무제한 사용할 수 있습니다.
 
 ## 기술 스택
 
 - Frontend: React + Vite + TypeScript + Tailwind CSS + Lucide + react-markdown + **Firebase Auth**
-- Backend: Vercel Serverless Functions (`/api/chat`, `/api/compare`, `/api/auto`)
-- Provider Adapter: 공통 인터페이스로 4개 LLM 추상화
+- Backend: Vercel Serverless Functions (`/api/chat`, `/api/compare`, `/api/auto`, `/api/rag/documents`)
+- Provider Adapter: 공통 인터페이스로 **5개** LLM 추상화 (GPT · Gemini · Claude · Perplexity · **Local**)
+- Local LLM: [LM Studio](https://lmstudio.ai/) OpenAI 호환 API (`http://localhost:1234/v1`)
+- Knowledge: System instruction + 서버측 RAG(키워드 청크 검색, `doc/` 화이트리스트)
 - Local Dev: Vite 미들웨어로 `/api`를 동일 포트에서 처리
-- Client Storage: `sessionStorage`(바우처), `localStorage`(히스토리·사이드바·방문자 체험 횟수)
+- Client Storage: `sessionStorage`(바우처), `localStorage`(히스토리·사이드바·방문자 체험·Knowledge 설정)
 
 ## 시작하기
 
@@ -50,6 +56,7 @@ GOOGLE_API_KEY=
 ANTHROPIC_API_KEY=
 PERPLEXITY_API_KEY=
 VOUCHER_CODE=
+LM_STUDIO_BASE_URL=http://localhost:1234
 ```
 
 클라이언트 (Vite `VITE_` prefix):
@@ -101,6 +108,19 @@ API는 서버 [`api/_lib/voucher.ts`](api/_lib/voucher.ts) 검증을 유지합�
 - **Compare**: 4 provider 병렬, 속도·토큰·비용·품질 비교
 - **AUTO**: 멀티 LLM 협의 라우팅 후 최적 모델이 최종 응답
 
+### Knowledge (System instruction · RAG)
+
+- **System instruction**: 역할·언어·형식 등 지시 (`localStorage` 키 `multi-llm-system-instruction`)
+- **RAG**: `doc/` 화이트리스트 문서에서 질문 관련 발췌를 검색해 프롬프트에 포함 (`GET /api/rag/documents`)
+- Chat · Compare · AUTO 요청 body에 `systemInstruction`, `rag` 전달 가능
+- 응답 `knowledge` 메타: System instruction / RAG 발췌 개수 배지 표시
+
+### Local LLM (LM Studio)
+
+- Model 목록 **Local** — 기본 모델 `gemma-4-12b-qat` (LM Studio에 로드된 모델 id와 일치해야 함)
+- LM Studio Local Server 실행 (`localhost:1234`) 필요
+- 외부 공유 방법: [doc/로컬 LLM 외부 공유 방법.md](doc/%EB%A1%9C%EC%BB%AC%20LLM%20%EC%99%B8%EB%B6%80%20%EA%B3%B5%EC%9C%A0%20%EB%B0%A9%EB%B2%95.md)
+
 ### GPT 스타일 접이식 사이드바
 
 - 좌측 **Chat · Compare · Auto · Settings · About** + **History**
@@ -132,9 +152,20 @@ Chat에서 provider별 드롭다운 (GPT `gpt-4o`/`gpt-5`, Claude Haiku/Sonnet/O
   "provider": "gpt",
   "model": "gpt-4o",
   "prompt": "Explain MCP",
-  "voucher": "<VOUCHER_CODE>"
+  "voucher": "<VOUCHER_CODE>",
+  "systemInstruction": "답변은 일본어로 작성하세요.",
+  "rag": {
+    "enabled": true,
+    "documentIds": ["req-features", "kpc-customers"],
+    "supplementalText": "선택: 추가 참고 텍스트",
+    "topK": 5
+  }
 }
 ```
+
+### `GET /api/rag/documents`
+
+RAG에 사용 가능한 `doc/` 문서 메타(id, title) 목록.
 
 ### `POST /api/compare` · `POST /api/auto`
 
@@ -148,12 +179,29 @@ Compare는 4 provider 병렬. AUTO는 Council 표결 + 최종 응답 및 `orches
 | Gemini     | `gemini-2.5-flash` |
 | Claude     | `claude-haiku-4-5` |
 | Perplexity | `sonar`            |
+| Local      | `gemma-4-12b-qat`  |
 
 ![Compare 모드 결과 화면](doc/compare-preview.png)
 
 ## 변경 이력 (최근)
 
-### 이번 작업 — Google 로그인 · 방문자 무료 체험 3회
+### 이번 작업 — Local LLM · Knowledge(RAG) · 안정화
+
+#### 주요 내용
+
+- **Local provider**: LM Studio OpenAI 호환 API (`api/_lib/providers/local.ts`), Model 선택 **Local** · `gemma-4-12b-qat`
+- **Knowledge UI**: `KnowledgePanel` — System instruction, RAG 문서 다중 선택, 추가 참고 텍스트
+- **서버 RAG**: `api/_lib/rag.ts` — `doc/` 화이트리스트, 키워드 기반 청크 검색, Chat/Compare/AUTO 공통 `prepareChat`
+- **System instruction**: 모든 provider adapter에 `system` 역할 전달
+- **API**: `GET /api/rag/documents`, chat/compare/auto body 확장 (`systemInstruction`, `rag`)
+- **문서**: Firebase 설정 템플릿, 로컬 HF 모델 추천, 로컬 LLM 외부 공유(ngrok/Cloudflare) 가이드
+
+#### 오류·UX 보완
+
+- **`useLocalStorage` 무한 렌더**: `initialValue` 참조 변경으로 `useEffect` 루프 → lazy init + `useRef`로 수정
+- **System instruction 미반영(RAG 사용 시)**: 긴 RAG user 블록이 system 지시를 압도 → `systemPrompt.ts`로 system 강화 + user 메시지 하단 `[System instruction — mandatory]` 재주입, RAG 안내 문구 중립화
+
+### 이전 작업 — Google 로그인 · 방문자 무료 체험 3회
 
 #### 주요 내용
 

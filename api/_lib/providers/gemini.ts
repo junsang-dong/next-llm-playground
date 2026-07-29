@@ -4,6 +4,7 @@ import { estimateCost, modelFor } from '../pricing.js'
 export async function callGemini(
   prompt: string,
   modelOverride?: string,
+  systemInstruction?: string,
 ): Promise<ChatResult> {
   const apiKey = process.env.GOOGLE_API_KEY
   if (!apiKey) {
@@ -18,6 +19,9 @@ export async function callGemini(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
+      ...(systemInstruction
+        ? { systemInstruction: { parts: [{ text: systemInstruction }] } }
+        : {}),
       contents: [{ parts: [{ text: prompt }] }],
     }),
   })

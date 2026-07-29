@@ -7,6 +7,7 @@ import { ResponseCard } from './ResponseCard'
 import { ResponseViewToggle } from './ResponseViewToggle'
 import type { ResponseViewMode } from './ResponseViewToggle'
 import { SpeedCard } from './SpeedCard'
+import { KnowledgeBadge } from './KnowledgeBadge'
 
 interface ChatWindowProps {
   result: ChatResult | AutoChatResult | null
@@ -52,6 +53,7 @@ export function ChatWindow({
   return (
     <div className="space-y-4">
       <ResponseViewToggle value={viewMode} onChange={setViewMode} />
+      <KnowledgeBadge knowledge={result.knowledge} />
       {isAutoChatResult(result) && (
         <OrchestrationSummary orchestration={result.orchestration} />
       )}

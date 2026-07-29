@@ -4,6 +4,7 @@ import { estimateCost, modelFor } from '../pricing.js'
 export async function callOpenAI(
   prompt: string,
   modelOverride?: string,
+  systemInstruction?: string,
 ): Promise<ChatResult> {
   const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) {
@@ -21,7 +22,12 @@ export async function callOpenAI(
     },
     body: JSON.stringify({
       model,
-      messages: [{ role: 'user', content: prompt }],
+      messages: [
+        ...(systemInstruction
+          ? [{ role: 'system' as const, content: systemInstruction }]
+          : []),
+        { role: 'user', content: prompt },
+      ],
     }),
   })
 

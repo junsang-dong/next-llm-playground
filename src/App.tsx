@@ -13,6 +13,8 @@ import { SettingsPanel } from './components/SettingsPanel'
 import { SlideMenu, type AppView } from './components/SlideMenu'
 import { AccessGate } from './components/AccessGate'
 import { isValidModelForProvider } from './constants/models'
+import { KnowledgePanel } from './components/KnowledgePanel'
+import { useKnowledgeSettings } from './hooks/useKnowledgeSettings'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import { useAuth } from './contexts/AuthContext'
 import {
@@ -79,6 +81,7 @@ export default function App() {
     const stored = getStoredVoucher()
     return Boolean(stored && isExpectedVoucher(stored))
   })
+  const [knowledgeSettings, setKnowledgeSettings] = useKnowledgeSettings()
 
   const unlocked = Boolean(user && voucherUnlocked && !authLoading)
   const guestTrialRemaining = useMemo(() => {
@@ -173,7 +176,10 @@ export default function App() {
     if (activeView === 'settings' || activeView === 'about') return
 
     const useGuestTrial = guestAccess
-    const apiOpts = useGuestTrial ? { guestTrial: true as const } : undefined
+    const apiOpts = {
+      ...(useGuestTrial ? { guestTrial: true as const } : {}),
+      knowledge: knowledgeSettings,
+    }
 
     setLoading(true)
     setError(null)
@@ -349,6 +355,12 @@ export default function App() {
                 disabled={loading || !canExecute}
               />
             )}
+
+            <KnowledgePanel
+              value={knowledgeSettings}
+              onChange={setKnowledgeSettings}
+              disabled={loading || !canExecute}
+            />
 
             <PromptInput
               value={prompt}

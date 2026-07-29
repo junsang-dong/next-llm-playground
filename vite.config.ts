@@ -48,6 +48,19 @@ function localApiPlugin(): Plugin {
           const { voucherError } = await server.ssrLoadModule(
             '/api/_lib/voucher.ts',
           )
+          const { parseChatInvokeOptions } = await server.ssrLoadModule(
+            '/api/_lib/knowledge.ts',
+          )
+          const { listRagDocuments } = await server.ssrLoadModule(
+            '/api/_lib/rag.ts',
+          )
+
+          if (url === '/api/rag/documents' && req.method === 'GET') {
+            res.statusCode = 200
+            res.setHeader('Content-Type', 'application/json')
+            res.end(JSON.stringify({ documents: listRagDocuments() }))
+            return
+          }
 
           if (url === '/api/chat' && req.method === 'POST') {
             const provider = body?.provider
@@ -56,6 +69,7 @@ function localApiPlugin(): Plugin {
             const model =
               typeof body?.model === 'string' ? body.model : undefined
             const voucherIssue = voucherError(body?.voucher)
+            const knowledgeOptions = parseChatInvokeOptions(body)
 
             if (voucherIssue) {
               res.statusCode = 401
@@ -70,7 +84,7 @@ function localApiPlugin(): Plugin {
               res.end(
                 JSON.stringify({
                   error:
-                    'provider must be one of: gpt, gemini, claude, perplexity',
+                    'provider must be one of: gpt, gemini, claude, perplexity, local',
                 }),
               )
               return
@@ -83,7 +97,7 @@ function localApiPlugin(): Plugin {
             }
 
             try {
-              const result = await routeChat(provider, prompt, model)
+              const result = await routeChat(provider, prompt, model, knowledgeOptions)
               res.statusCode = 200
               res.setHeader('Content-Type', 'application/json')
               res.end(JSON.stringify(result))
@@ -101,6 +115,7 @@ function localApiPlugin(): Plugin {
             const prompt =
               typeof body?.prompt === 'string' ? body.prompt.trim() : ''
             const voucherIssue = voucherError(body?.voucher)
+            const knowledgeOptions = parseChatInvokeOptions(body)
 
             if (voucherIssue) {
               res.statusCode = 401
@@ -120,7 +135,7 @@ function localApiPlugin(): Plugin {
               PROVIDERS.map(async (provider: string) => {
                 const started = Date.now()
                 try {
-                  return await routeChat(provider, prompt)
+                  return await routeChat(provider, prompt, undefined, knowledgeOptions)
                 } catch (error) {
                   return {
                     provider,
@@ -144,6 +159,7 @@ function localApiPlugin(): Plugin {
             const prompt =
               typeof body?.prompt === 'string' ? body.prompt.trim() : ''
             const voucherIssue = voucherError(body?.voucher)
+            const knowledgeOptions = parseChatInvokeOptions(body)
 
             if (voucherIssue) {
               res.statusCode = 401
@@ -160,7 +176,7 @@ function localApiPlugin(): Plugin {
             }
 
             try {
-              const result = await runOrchestration(prompt)
+              const result = await runOrchestration(prompt, knowledgeOptions)
               res.statusCode = 200
               res.setHeader('Content-Type', 'application/json')
               res.end(JSON.stringify(result))

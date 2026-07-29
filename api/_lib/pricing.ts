@@ -17,6 +17,7 @@ const PRICING: Record<
   'claude-opus-4-5': { input: 15.0, output: 75.0 },
   sonar: { input: 1.0, output: 1.0 },
   'sonar-pro': { input: 3.0, output: 15.0 },
+  'gemma-4-12b-qat': { input: 0, output: 0 },
 }
 
 export function estimateCost(
