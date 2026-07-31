@@ -11,6 +11,9 @@ interface ModelSelectorProps {
   modelsByProvider: Record<ProviderId, string>
   onModelChange: (provider: ProviderId, modelId: string) => void
   disabled?: boolean
+  /** Providers that cannot be selected (e.g. Local when LM Studio is offline) */
+  unavailableProviders?: Partial<Record<ProviderId, string>>
+  localStatusLoading?: boolean
 }
 
 export function ModelSelector({
@@ -19,6 +22,8 @@ export function ModelSelector({
   modelsByProvider,
   onModelChange,
   disabled,
+  unavailableProviders = {},
+  localStatusLoading,
 }: ModelSelectorProps) {
   const activeProvider = value !== 'auto' ? value : null
 
@@ -30,15 +35,24 @@ export function ModelSelector({
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-6">
         {PROVIDERS.map((provider) => {
           const selected = value === provider
+          const unavailableReason = unavailableProviders[provider]
+          const providerDisabled = Boolean(unavailableReason)
           return (
             <label
               key={provider}
+              title={unavailableReason}
               className={[
-                'cursor-pointer rounded-xl border px-3 py-3 text-left transition',
-                selected
+                'rounded-xl border px-3 py-3 text-left transition',
+                providerDisabled
+                  ? 'cursor-not-allowed border-slate-200 bg-slate-100/80 opacity-55'
+                  : 'cursor-pointer',
+                !providerDisabled && selected
                   ? 'border-[var(--accent)] bg-sky-50 shadow-[0_0_0_1px_var(--accent)]'
-                  : 'border-[var(--line)] bg-white/70 hover:border-sky-300',
-                disabled ? 'opacity-60' : '',
+                  : '',
+                !providerDisabled && !selected
+                  ? 'border-[var(--line)] bg-white/70 hover:border-sky-300'
+                  : '',
+                disabled && !providerDisabled ? 'opacity-60' : '',
               ].join(' ')}
             >
               <input
@@ -46,13 +60,20 @@ export function ModelSelector({
                 name="provider"
                 className="sr-only"
                 checked={selected}
-                onChange={() => onChange(provider)}
+                disabled={providerDisabled || disabled}
+                onChange={() => {
+                  if (!providerDisabled) onChange(provider)
+                }}
               />
               <div className="font-[family-name:var(--display)] text-base font-semibold text-[var(--ink)]">
                 {PROVIDER_LABELS[provider]}
               </div>
               <div className="mt-1 font-[family-name:var(--mono)] text-xs text-[var(--muted)]">
-                {modelsByProvider[provider]}
+                {provider === 'local' && localStatusLoading
+                  ? '확인 중…'
+                  : providerDisabled
+                    ? '사용 불가'
+                    : modelsByProvider[provider]}
               </div>
             </label>
           )
@@ -83,7 +104,7 @@ export function ModelSelector({
         </label>
       </div>
 
-      {activeProvider && (
+      {activeProvider && !unavailableProviders[activeProvider] && (
         <div className="rounded-xl border border-[var(--line)] bg-white/80 px-4 py-3">
           <label
             htmlFor="model-select"
@@ -105,6 +126,13 @@ export function ModelSelector({
             ))}
           </select>
         </div>
+      )}
+
+      {unavailableProviders.local && (
+        <p className="text-xs text-[var(--muted)]">
+          Local LLM: {unavailableProviders.local}. LM Studio Local Server를
+          켠 뒤 페이지를 새로고침하세요.
+        </p>
       )}
     </fieldset>
   )

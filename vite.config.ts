@@ -62,6 +62,17 @@ function localApiPlugin(): Plugin {
             return
           }
 
+          if (url === '/api/local/status' && req.method === 'GET') {
+            const { checkLocalLlmStatus } = await server.ssrLoadModule(
+              '/api/_lib/localStatus.ts',
+            )
+            const status = await checkLocalLlmStatus()
+            res.statusCode = 200
+            res.setHeader('Content-Type', 'application/json')
+            res.end(JSON.stringify(status))
+            return
+          }
+
           if (url === '/api/chat' && req.method === 'POST') {
             const provider = body?.provider
             const prompt =

@@ -1,14 +1,14 @@
 import type { ChatResult, ProviderId } from '../types.js'
 import { DEFAULT_MODELS } from '../types.js'
 
-const DEFAULT_BASE_URL = 'http://localhost:1234'
+import { getLmStudioBaseUrl } from '../localStatus.js'
 
 export async function callLocal(
   prompt: string,
   modelOverride?: string,
   systemInstruction?: string,
 ): Promise<ChatResult> {
-  const baseUrl = (process.env.LM_STUDIO_BASE_URL?.trim() || DEFAULT_BASE_URL).replace(/\/+$/, '')
+  const baseUrl = getLmStudioBaseUrl()
   const model = modelOverride?.trim() || DEFAULT_MODELS.local
 
   const started = Date.now()

@@ -119,6 +119,8 @@ API는 서버 [`api/_lib/voucher.ts`](api/_lib/voucher.ts) 검증을 유지합�
 
 - Model 목록 **Local** — 기본 모델 `gemma-4-12b-qat` (LM Studio에 로드된 모델 id와 일치해야 함)
 - LM Studio Local Server 실행 (`localhost:1234`) 필요
+- **앱 시작 시** `GET /api/local/status`로 연결·모델 로드 여부를 확인. 사용 불가면 **Local 버튼 비활성**
+- Vercel 배포 환경에서는 서버가 사용자 PC의 `localhost`에 닿지 않으므로, 터널 URL을 `LM_STUDIO_BASE_URL`에 넣지 않으면 Local은 비활성됩니다
 - 외부 공유 방법: [doc/로컬 LLM 외부 공유 방법.md](doc/%EB%A1%9C%EC%BB%AC%20LLM%20%EC%99%B8%EB%B6%80%20%EA%B3%B5%EC%9C%A0%20%EB%B0%A9%EB%B2%95.md)
 
 ### GPT 스타일 접이식 사이드바
@@ -163,6 +165,10 @@ Chat에서 provider별 드롭다운 (GPT `gpt-4o`/`gpt-5`, Claude Haiku/Sonnet/O
 }
 ```
 
+### `GET /api/local/status`
+
+LM Studio(`/v1/models`) 연결 가능 여부와 로드된 모델 목록. UI에서 Local 버튼 활성/비활성에 사용.
+
 ### `GET /api/rag/documents`
 
 RAG에 사용 가능한 `doc/` 문서 메타(id, title) 목록.
@@ -185,7 +191,21 @@ Compare는 4 provider 병렬. AUTO는 Council 표결 + 최종 응답 및 `orches
 
 ## 변경 이력 (최근)
 
-### 이번 작업 — Local LLM · Knowledge(RAG) · 안정화
+### 이번 작업 — Local LLM 가용성 검사 · Local 버튼 비활성
+
+#### 주요 내용
+
+- **앱 시작 시 Local 평가**: `GET /api/local/status` → LM Studio `/v1/models` 프로브 (타임아웃 2.5초)
+- **Local 버튼 비활성**: 연결 실패·모델 미로드 시 Model 선택에서 Local을 비활성하고 「사용 불가」 표시
+- 비활성 상태에서 Local이 선택되어 있으면 GPT로 자동 전환 (히스토리 복원 시에도 동일)
+- README·배포 안내: Vercel에서는 `localhost` Local이 기본 불가, 터널 URL 필요 시 `LM_STUDIO_BASE_URL` 사용
+
+#### 오류·UX 보완
+
+- Local 선택 불가 시 안내 문구로 LM Studio Local Server 실행·새로고침 유도
+- 상태 확인 중에는 Local 카드에 「확인 중…」 표시
+
+### 이전 작업 — Local LLM · Knowledge(RAG) · 안정화
 
 #### 주요 내용
 

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AboutPanel } from './components/AboutPanel'
 import { AppShell } from './components/AppShell'
 import { ChatWindow } from './components/ChatWindow'
@@ -35,6 +35,7 @@ import {
   getGuestTrialRemaining,
   recordGuestTrialUse,
 } from './services/guestTrial'
+import { fetchLocalLlmStatus } from './services/localStatus'
 import type {
   AutoChatResult,
   ChatResult,
@@ -82,6 +83,38 @@ export default function App() {
     return Boolean(stored && isExpectedVoucher(stored))
   })
   const [knowledgeSettings, setKnowledgeSettings] = useKnowledgeSettings()
+  const [localStatusLoading, setLocalStatusLoading] = useState(true)
+  const [localUnavailableReason, setLocalUnavailableReason] = useState<
+    string | null
+  >(null)
+
+  useEffect(() => {
+    let cancelled = false
+    setLocalStatusLoading(true)
+    fetchLocalLlmStatus()
+      .then((status) => {
+        if (cancelled) return
+        if (status.available) {
+          setLocalUnavailableReason(null)
+        } else {
+          setLocalUnavailableReason(
+            status.error ?? 'LM Studio를 사용할 수 없습니다',
+          )
+          setProvider((prev) => (prev === 'local' ? 'gpt' : prev))
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLocalStatusLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const unavailableProviders = useMemo(() => {
+    if (!localUnavailableReason) return {}
+    return { local: localUnavailableReason }
+  }, [localUnavailableReason])
 
   const unlocked = Boolean(user && voucherUnlocked && !authLoading)
   const guestTrialRemaining = useMemo(() => {
@@ -126,6 +159,7 @@ export default function App() {
   }
 
   function handleProviderChange(next: ChatProviderSelection) {
+    if (next === 'local' && localUnavailableReason) return
     setProvider(next)
     if (next === 'auto') {
       setActiveView('auto')
@@ -139,36 +173,43 @@ export default function App() {
     setModelsByProvider((prev) => ({ ...prev, [providerId]: modelId }))
   }
 
-  const applyHistoryEntry = useCallback((entry: HistoryEntry) => {
-    setSelectedHistoryId(entry.id)
-    setPrompt(entry.prompt)
-    setError(null)
+  const applyHistoryEntry = useCallback(
+    (entry: HistoryEntry) => {
+      setSelectedHistoryId(entry.id)
+      setPrompt(entry.prompt)
+      setError(null)
 
-    if (entry.mode === 'compare') {
-      setMode('compare')
-      setActiveView('compare')
-      setComparePrompt(entry.comparePrompt ?? entry.prompt)
-      setCompareItems(entry.compareItems ?? null)
-      setChatResult(null)
-    } else {
-      setMode('chat')
-      setActiveView(entry.mode === 'auto' ? 'auto' : 'chat')
-      setProvider(entry.provider)
-      setChatResult(entry.chatResult ?? null)
-      setCompareItems(null)
-      setComparePrompt('')
-      if (
-        entry.provider !== 'auto' &&
-        entry.model &&
-        isValidModelForProvider(entry.provider, entry.model)
-      ) {
-        setModelsByProvider((prev) => ({
-          ...prev,
-          [entry.provider]: entry.model!,
-        }))
+      if (entry.mode === 'compare') {
+        setMode('compare')
+        setActiveView('compare')
+        setComparePrompt(entry.comparePrompt ?? entry.prompt)
+        setCompareItems(entry.compareItems ?? null)
+        setChatResult(null)
+      } else {
+        setMode('chat')
+        setActiveView(entry.mode === 'auto' ? 'auto' : 'chat')
+        const nextProvider =
+          entry.provider === 'local' && localUnavailableReason
+            ? 'gpt'
+            : entry.provider
+        setProvider(nextProvider)
+        setChatResult(entry.chatResult ?? null)
+        setCompareItems(null)
+        setComparePrompt('')
+        if (
+          entry.provider !== 'auto' &&
+          entry.model &&
+          isValidModelForProvider(entry.provider, entry.model)
+        ) {
+          setModelsByProvider((prev) => ({
+            ...prev,
+            [entry.provider]: entry.model!,
+          }))
+        }
       }
-    }
-  }, [])
+    },
+    [localUnavailableReason],
+  )
 
   async function handleSubmit() {
     const trimmed = prompt.trim()
@@ -353,6 +394,8 @@ export default function App() {
                 modelsByProvider={modelsByProvider}
                 onModelChange={handleModelChange}
                 disabled={loading || !canExecute}
+                unavailableProviders={unavailableProviders}
+                localStatusLoading={localStatusLoading}
               />
             )}
 
