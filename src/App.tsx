@@ -331,10 +331,10 @@ export default function App() {
       topBar={
         <div className="min-w-0 py-0.5">
           <p className="truncate font-[family-name:var(--mono)] text-[10px] tracking-[0.15em] text-[var(--accent-deep)] uppercase sm:text-xs">
-            Goorm AI Gateway
+            All-in-One AI Gateway
           </p>
           <h1 className="truncate font-[family-name:var(--display)] text-lg font-bold tracking-tight text-[var(--ink)] sm:text-xl">
-            Multi LLM Playground
+            NextLLM Playground
           </h1>
         </div>
       }

@@ -1,4 +1,4 @@
-# Multi LLM Playground
+# NextLLM Playground
 
 ![Knowledge 패널 — System instruction · RAG 문서 선택](doc/knowledge-panel-preview.png)
 
@@ -6,7 +6,7 @@
 
 ![Local LLM — LM Studio Gemma 4 Chat](doc/local-llm-preview.png)
 
-**Goorm AI Gateway** — 하나의 UI에서 GPT, Gemini, Claude, Perplexity, **Local(LM Studio)** 를 선택·비교하거나, AUTO 모드로 멀티 LLM이 협의해 최적 모델에 응답을 맡기는 AI Gateway 학습용 앱입니다. **Knowledge** 패널에서 **System instruction**과 **RAG(프로젝트 `doc/` 문서)** 를 설정할 수 있습니다. **미로그인 방문자**는 Chat·Compare·AUTO 합산 **3회 무료 체험** 후, **Google 로그인 + 바우처**로 무제한 사용할 수 있습니다.
+**All-in-One AI Gateway · NextLLM Playground** — 하나의 UI에서 GPT, Gemini, Claude, Perplexity, **Local(LM Studio)** 를 선택·비교하거나, AUTO 모드로 멀티 LLM이 협의해 최적 모델에 응답을 맡기는 AI Gateway 학습용 앱입니다. **Knowledge** 패널에서 **System instruction**과 **RAG(프로젝트 `doc/` 문서)** 를 설정할 수 있습니다. **미로그인 방문자**는 Chat·Compare·AUTO 합산 **3회 무료 체험** 후, **Google 로그인 + 바우처**로 무제한 사용할 수 있습니다.
 
 ## 기술 스택
 

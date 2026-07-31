@@ -67,7 +67,7 @@ MCP 서버를 만들어 Cursor나 Claude Desktop에서 도구로 사용하게 �
 
 ---
 
-## 4. Multi LLM Playground 앱 자체를 공유
+## 4. NextLLM Playground 앱 자체를 공유
 
 현재 앱을 Vercel에 배포하고, `LM_STUDIO_BASE_URL`을 터널 URL로 설정하면:
 
