@@ -72,7 +72,9 @@ export function ModelSelector({
                 {provider === 'local' && localStatusLoading
                   ? '확인 중…'
                   : providerDisabled
-                    ? '사용 불가'
+                    ? provider === 'local'
+                      ? '로컬 머신 LM Studio 연결 필요'
+                      : '사용 불가'
                     : modelsByProvider[provider]}
               </div>
             </label>
@@ -130,8 +132,8 @@ export function ModelSelector({
 
       {unavailableProviders.local && (
         <p className="text-xs text-[var(--muted)]">
-          Local LLM: {unavailableProviders.local}. LM Studio Local Server를
-          켠 뒤 페이지를 새로고침하세요.
+          Local LLM: 로컬 머신 LM Studio 연결 필요. Local Server를 켠 뒤
+          페이지를 새로고침하세요.
         </p>
       )}
     </fieldset>

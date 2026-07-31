@@ -339,10 +339,9 @@ export default function App() {
         </div>
       }
       footer={
-        <footer className="text-center text-xs text-[var(--muted)]">
-          <p>API keys stay on the server · USD × 1400 ≈ KRW</p>
-          <p className="mt-1">
-            Developed by JUN ·{' '}
+        <footer className="space-y-1 text-center text-xs text-[var(--muted)]">
+          <p>
+            Developed by Jun ·{' '}
             <a
               href="https://nextplatform.net"
               target="_blank"
@@ -353,6 +352,7 @@ export default function App() {
             </a>{' '}
             | React · Vite · TypeScript · Vercel
           </p>
+          <p>Built with Cursor · SPEC with ChatGPT | Version 1.0.0 · © 2026</p>
         </footer>
       }
     >
