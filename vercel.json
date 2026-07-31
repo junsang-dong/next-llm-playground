@@ -1,13 +1,23 @@
 {
   "functions": {
     "api/chat.ts": {
-      "maxDuration": 30
+      "maxDuration": 30,
+      "includeFiles": "doc/**"
     },
     "api/compare.ts": {
-      "maxDuration": 60
+      "maxDuration": 60,
+      "includeFiles": "doc/**"
     },
     "api/auto.ts": {
-      "maxDuration": 60
+      "maxDuration": 60,
+      "includeFiles": "doc/**"
+    },
+    "api/rag/documents.ts": {
+      "maxDuration": 10,
+      "includeFiles": "doc/**"
+    },
+    "api/local/status.ts": {
+      "maxDuration": 10
     }
   },
   "rewrites": [
